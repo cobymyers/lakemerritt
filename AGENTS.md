@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
 
 ## Commands
 
@@ -29,7 +29,7 @@ No test runner is configured.
 
 ### Source layout
 
-- `app/layout.jsx` — Root layout with metadata; imports `app/globals.css` (Tailwind directives)
+- `app/layout.jsx` — Root layout with metadata and font `<link>` tags; imports `app/globals.css`
 - `app/page.jsx` — Re-exports the default component from `src/LakeMerrittPage.jsx`
 - `src/LakeMerrittPage.jsx` — Single-file client component (`'use client'`) containing the full page and all sub-components
 
@@ -73,4 +73,4 @@ GitHub Actions (`.github/workflows/deploy.yml`) triggers on push to `main`:
 
 **To activate GitHub Pages:** repo Settings → Pages → Source: **GitHub Actions**
 
-`AGENTS.md` duplicates this file for other AI tools — if you update commands or architecture here, mirror the change there.
+`CLAUDE.md` duplicates this file for Claude Code — if you update commands or architecture here, mirror the change there.

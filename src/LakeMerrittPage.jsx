@@ -16,17 +16,16 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Sun, Moon, MapPin, Bird, Waves, TreePine, Music, ChevronDown,
 } from 'lucide-react';
 
 /* ─── Assets ─────────────────────────────────────────────────────────────── */
 const IMG = {
-  dayHero:    'https://images.unsplash.com/photo-1518663806013-4375cb4bcbc4?q=80&w=1600&auto=format&fit=crop',
-  dayFlowers: 'https://images.unsplash.com/photo-1558486940-20512ee01cc0?q=80&w=800&auto=format&fit=crop',
-  dayPark:    'https://images.unsplash.com/photo-1588611910245-1c70e30325d9?q=80&w=800&auto=format&fit=crop',
-  nightHero:  'https://images.unsplash.com/photo-1506755490074-6019a5c48ed4?q=80&w=1600&auto=format&fit=crop',
+  dayHero:    'https://images.unsplash.com/photo-1439066615861-d1af74d74000?q=80&w=1600&auto=format&fit=crop',
+  dayFlowers: 'https://images.unsplash.com/photo-1490750967868-88aa4486c946?q=80&w=800&auto=format&fit=crop',
+  dayPark:    'https://images.unsplash.com/photo-1502082553048-f009c37129b9?q=80&w=800&auto=format&fit=crop',
   nightMoody: 'https://images.unsplash.com/photo-1505322022379-7c3353ee6291?q=80&w=800&auto=format&fit=crop',
 };
 
@@ -80,100 +79,117 @@ const CARDS = [
   },
 ];
 
+/* ─── Rotating hero words — blurred swap, à la dolsten.com ──────────────── */
+const HERO_WORDS = [
+  'The Heart of Oakland',
+  'The Living Necklace',
+  'A Tidal Sanctuary',
+  'An Urban Estuary',
+];
+
+/* ─── Marquee strip content ──────────────────────────────────────────────── */
+const MARQUEE =
+  'Est. 1870 — First Official Wildlife Refuge — 3.4-Mile Loop — 3,400 Lights — The Living Necklace — Oakland, California — ';
+
 /* ─── Component ──────────────────────────────────────────────────────────── */
 export default function LakeMerrittPage() {
   const [isDark, setIsDark] = useState(false);
   const [activePin, setActivePin] = useState(null);
+  const [progress, setProgress] = useState(0);        // preloader counter 0→100
+  const [loaded, setLoaded] = useState(false);        // counter finished, curtain lifting
+  const [loaderGone, setLoaderGone] = useState(false); // curtain done, unmount preloader
+  const [wordIdx, setWordIdx] = useState(0);          // rotating hero word
+  const [scrollPct, setScrollPct] = useState(0);      // top scroll progress bar
+
+  /* Preloader — eased 0→100 counter over ~1.6s */
+  useEffect(() => {
+    if (loaded) return;
+    let raf; let start;
+    const DURATION = 1600;
+    const tick = (t) => {
+      if (start === undefined) start = t;
+      const k = Math.min(1, (t - start) / DURATION);
+      setProgress(Math.round(100 * (1 - Math.pow(1 - k, 3))));
+      if (k < 1) raf = requestAnimationFrame(tick);
+      else setLoaded(true);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [loaded]);
+
+  /* Unmount preloader after the curtain-lift transition finishes */
+  useEffect(() => {
+    if (!loaded) return;
+    const id = setTimeout(() => setLoaderGone(true), 950);
+    return () => clearTimeout(id);
+  }, [loaded]);
+
+  /* Lock scroll while the preloader is up */
+  useEffect(() => {
+    document.body.style.overflow = loaded ? '' : 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, [loaded]);
+
+  /* Rotating hero word */
+  useEffect(() => {
+    const id = setInterval(() => setWordIdx(i => (i + 1) % HERO_WORDS.length), 3200);
+    return () => clearInterval(id);
+  }, []);
+
+  /* Scroll progress bar */
+  useEffect(() => {
+    const onScroll = () => {
+      const el = document.documentElement;
+      const max = el.scrollHeight - el.clientHeight;
+      setScrollPct(max > 0 ? (el.scrollTop / max) * 100 : 0);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const toggle = () => {
     setIsDark(d => !d);
     setActivePin(null);
   };
 
-  /* Card images cycle: day uses dayFlowers/dayHero/dayPark/dayPark;
-     night swaps last card to nightMoody for atmosphere */
-  const cardImgs = [
-    IMG.dayFlowers,
-    IMG.dayHero,
-    IMG.dayPark,
-    isDark ? IMG.nightMoody : IMG.dayPark,
-  ];
+  /* Card images (day). The last card layers IMG.nightMoody on top,
+     crossfaded in at night — same src-swap limitation as the hero */
+  const cardImgs = [IMG.dayFlowers, IMG.dayHero, IMG.dayPark, IMG.dayPark];
 
   return (
     /* ── Root: adding `dark` class here activates Tailwind dark: variants ── */
     <div className={isDark ? 'dark' : ''}>
       <div className="min-h-screen bg-[#f2f8f4] dark:bg-[#060c18] text-[#172817] dark:text-white transition-colors duration-700 selection:bg-amber-400/30">
 
-        {/* ── Injected styles (fonts + keyframes) ─────────────────────── */}
-        <style>{`
-          @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400;1,600&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap');
+        {/* ════════ PRELOADER — 0→100 counter, then curtain lifts ════════ */}
+        {!loaderGone && (
+          <div
+            aria-hidden={loaded}
+            className={`fixed inset-0 z-[100] flex flex-col items-center justify-center
+              bg-[#f2f8f4] transition-transform duration-[900ms] ease-[cubic-bezier(.76,0,.24,1)]
+              ${loaded ? '-translate-y-full' : ''}`}
+          >
+            <p className="f-mono text-[10px] tracking-[.35em] uppercase text-emerald-700/60 mb-6">
+              Lake Merritt · Oakland, CA
+            </p>
+            <p className="f-mono font-light tabular-nums text-emerald-950"
+              style={{ fontSize: 'clamp(3rem,8vw,5.5rem)', lineHeight: 1 }}>
+              {progress}%
+            </p>
+            <div className="w-44 h-px bg-emerald-900/15 mt-8">
+              <div className="h-full bg-emerald-600" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+        )}
 
-          /* Font helpers */
-          .f-display { font-family: 'Cormorant Garamond', Georgia, serif; }
-          .f-body     { font-family: 'DM Sans', system-ui, sans-serif; }
-
-          /* Water shimmer */
-          @keyframes shimmer {
-            0%,100% { background-position: 0% 50%; }
-            50%      { background-position: 100% 50%; }
-          }
-          .water-day {
-            background: linear-gradient(135deg,#38bdf8,#0ea5e9,#06b6d4,#22d3ee,#38bdf8);
-            background-size: 300% 300%;
-            animation: shimmer 8s ease infinite;
-          }
-          .water-night {
-            background: linear-gradient(135deg,#0b1e3d,#0f2a50,#142f60,#0b1e3d);
-            background-size: 300% 300%;
-            animation: shimmer 10s ease infinite;
-          }
-
-          /* Necklace glow – applied to containers in dark mode */
-          .necklace {
-            box-shadow:
-              0 0 0 1px rgba(251,191,36,.45),
-              0 0 20px 4px rgba(251,191,36,.10),
-              0 0 60px 8px rgba(251,191,36,.04),
-              inset 0 0 28px 2px rgba(251,191,36,.03);
-          }
-
-          /* Floating caret */
-          @keyframes float {
-            0%,100% { transform:translateY(0); }
-            50%      { transform:translateY(-9px); }
-          }
-          .float { animation: float 3.8s ease-in-out infinite; }
-
-          /* Amber dot pulse */
-          @keyframes amber-pulse {
-            0%,100% { opacity:.75; }
-            50%      { opacity:1; filter:drop-shadow(0 0 5px rgba(251,191,36,.9)); }
-          }
-          .a-pulse { animation: amber-pulse 2s ease-in-out infinite; }
-
-          /* Fact panel fade-up */
-          @keyframes fade-up {
-            from { opacity:0; transform:translateY(12px); }
-            to   { opacity:1; transform:translateY(0); }
-          }
-          .fade-up { animation: fade-up .35s ease forwards; }
-
-          /* Card lift */
-          .card-lift { transition: transform .35s cubic-bezier(.34,1.56,.64,1), box-shadow .35s ease; }
-          .card-lift:hover { transform: translateY(-7px); }
-
-          /* Pin hover */
-          .pin-icon { transition: transform .2s ease; }
-          button:hover .pin-icon { transform: scale(1.2) translateY(-3px); }
-
-          /* Stripe texture on water */
-          .water-stripes {
-            background-image: repeating-linear-gradient(
-              0deg, transparent, transparent 11px,
-              rgba(255,255,255,.18) 11px, rgba(255,255,255,.18) 12px
-            );
-          }
-        `}</style>
+        {/* ════════ SCROLL PROGRESS BAR ═══════════════════════════════════ */}
+        <div className="fixed inset-x-0 top-0 z-[60] h-[3px] pointer-events-none">
+          <div
+            className={`h-full transition-colors duration-700 ${isDark ? 'bg-amber-400' : 'bg-emerald-500'}`}
+            style={{ width: `${scrollPct}%` }}
+          />
+        </div>
 
         {/* ════════ HEADER ════════════════════════════════════════════════ */}
         <header className="fixed inset-x-0 top-0 z-50">
@@ -186,7 +202,7 @@ export default function LakeMerrittPage() {
             {/* Wordmark */}
             <div className="flex items-center gap-2.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 dark:bg-amber-400 transition-colors duration-700" />
-              <span className="text-[11px] tracking-[.25em] uppercase font-medium
+              <span className="f-mono text-[11px] tracking-[.25em] uppercase font-medium
                 text-emerald-700 dark:text-amber-400/80 transition-colors duration-700">
                 Lake Merritt
               </span>
@@ -195,7 +211,7 @@ export default function LakeMerrittPage() {
             {/* Toggle button */}
             <button
               onClick={toggle}
-              className="flex items-center gap-2.5 px-5 py-2 rounded-full text-xs font-medium tracking-wide
+              className="f-mono flex items-center gap-2.5 px-5 py-2 rounded-full text-xs font-medium tracking-wide
                 transition-all duration-500 cursor-pointer
                 bg-sky-100 border border-sky-200/90 text-sky-700 hover:bg-sky-200/70
                 dark:bg-amber-500/10 dark:border dark:border-amber-400/30 dark:text-amber-300 dark:hover:bg-amber-500/15"
@@ -211,18 +227,35 @@ export default function LakeMerrittPage() {
         {/* ════════ HERO ══════════════════════════════════════════════════ */}
         <section className="relative min-h-screen flex items-end overflow-hidden">
 
-          {/* Background */}
+          {/* Background — pure CSS motion: shimmering water gradient plus
+              concentric shoreline rings drifting on slow counter-rotations
+              (organic border-radius makes rotation read as a shoreline) */}
           <div className="absolute inset-0">
-            <img
-              src={isDark ? IMG.nightHero : IMG.dayHero}
-              alt="Lake Merritt aerial view"
-              className="w-full h-full object-cover transition-all duration-1000"
-              style={{
-                filter: isDark
-                  ? 'brightness(.5) saturate(.75)'
-                  : 'brightness(.88) saturate(1.1)',
-              }}
+            <div
+              className={`absolute inset-0 transition-opacity duration-1000 ${isDark ? 'water-night' : 'water-day'}`}
+              style={{ opacity: isDark ? 0.5 : 0.35 }}
             />
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              {[
+                { w: '58%', h: '38%', dur: 55, rev: false, dashed: true,  a: isDark ? 0.30 : 0.40 },
+                { w: '78%', h: '52%', dur: 75, rev: true,  dashed: false, a: isDark ? 0.20 : 0.28 },
+                { w: '98%', h: '66%', dur: 95, rev: false, dashed: false, a: isDark ? 0.12 : 0.18 },
+              ].map((r, i) => (
+                <div
+                  key={i}
+                  className="absolute"
+                  style={{
+                    width: r.w,
+                    height: r.h,
+                    borderRadius: '60% 40% 52% 48% / 46% 52% 48% 54%',
+                    border: `1.5px ${r.dashed ? 'dashed' : 'solid'} ${
+                      isDark ? `rgba(251,191,36,${r.a})` : `rgba(2,132,199,${r.a})`
+                    }`,
+                    animation: `spin-slow ${r.dur}s linear infinite${r.rev ? ' reverse' : ''}`,
+                  }}
+                />
+              ))}
+            </div>
             <div className={`absolute inset-0 transition-all duration-1000 ${
               isDark
                 ? 'bg-gradient-to-t from-[#060c18] via-[#060c18]/55 to-[#060c18]/15'
@@ -230,12 +263,15 @@ export default function LakeMerrittPage() {
             }`} />
           </div>
 
-          {/* Hero text */}
-          <div className="relative z-10 max-w-7xl mx-auto px-6 pb-28 pt-36 w-full">
+          {/* Hero text + right-hand stats */}
+          <div className="relative z-10 max-w-7xl mx-auto px-6 pb-28 pt-36 w-full flex items-end justify-between gap-12">
+
+            {/* Left column */}
+            <div>
 
             {/* Badge */}
             <div className={`inline-flex items-center gap-2 mb-8 px-4 py-2 rounded-full
-              text-[11px] tracking-[.22em] uppercase font-medium f-body transition-all duration-700 ${
+              text-[11px] tracking-[.22em] uppercase font-medium f-mono transition-all duration-700 ${
               isDark
                 ? 'bg-amber-400/10 border border-amber-400/25 text-amber-300'
                 : 'bg-white/55 border border-emerald-200/80 text-emerald-700 backdrop-blur-sm'
@@ -256,9 +292,9 @@ export default function LakeMerrittPage() {
               </span>
             </h1>
 
-            {/* Sub */}
-            <p className="f-display text-2xl italic font-light mb-3 text-slate-600 dark:text-white/70 transition-colors duration-700">
-              The Heart of Oakland
+            {/* Rotating sub — blurred word swap, keyed remount replays the animation */}
+            <p className="f-display text-2xl italic font-light mb-3 h-8 text-slate-600 dark:text-white/70 transition-colors duration-700">
+              <span key={wordIdx} className="blur-in inline-block">{HERO_WORDS[wordIdx]}</span>
             </p>
             <p className={`f-body text-xs tracking-[.18em] uppercase transition-colors duration-700 ${
               isDark ? 'text-amber-400/50' : 'text-slate-400'
@@ -270,6 +306,38 @@ export default function LakeMerrittPage() {
             <div className={`mt-14 transition-colors duration-700 ${isDark ? 'text-amber-400/30' : 'text-slate-300'}`}>
               <ChevronDown size={22} className="float" />
             </div>
+
+            </div>{/* /Left column */}
+
+            {/* Right-hand stats — fills the hero's dead space on wide screens */}
+            <div className="hidden lg:flex flex-col items-end gap-6 f-mono text-right pb-1">
+              {[
+                ['3.4', 'Mile Perimeter Loop'],
+                ['3,400', 'Globe Lights'],
+                ['5', 'Bird Islands'],
+                ['1870', 'Est. Wildlife Refuge'],
+              ].map(([num, label]) => (
+                <div key={label}>
+                  <p className={`f-display text-4xl font-light leading-none transition-colors duration-700 ${
+                    isDark ? 'text-amber-300' : 'text-emerald-700'
+                  }`}>{num}</p>
+                  <p className={`text-[10px] tracking-[.25em] uppercase mt-2 transition-colors duration-700 ${
+                    isDark ? 'text-white/35' : 'text-slate-500'
+                  }`}>{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Vertical coordinates along the right edge */}
+          <div
+            aria-hidden="true"
+            className={`hidden xl:block absolute right-7 top-1/2 -translate-y-1/2 z-10 f-mono text-[10px] tracking-[.4em] uppercase transition-colors duration-700 ${
+              isDark ? 'text-amber-400/25' : 'text-slate-400'
+            }`}
+            style={{ writingMode: 'vertical-rl' }}
+          >
+            37.8044° N · 122.2578° W — Lake Merritt
           </div>
 
           {/* Necklace light strip along bottom edge (night only) */}
@@ -289,15 +357,34 @@ export default function LakeMerrittPage() {
           )}
         </section>
 
+        {/* ════════ MARQUEE STRIP ═════════════════════════════════════════ */}
+        <div className={`overflow-hidden border-y transition-colors duration-700 ${
+          isDark ? 'border-amber-500/10 bg-[#081019]' : 'border-sky-200/50 bg-white/50'
+        }`}>
+          <div className="marquee-track flex w-max py-3.5">
+            {[0, 1].map(copy => (
+              <span
+                key={copy}
+                aria-hidden={copy === 1}
+                className={`f-mono text-[10px] tracking-[.35em] uppercase whitespace-nowrap transition-colors duration-700 ${
+                  isDark ? 'text-amber-400/40' : 'text-emerald-700/50'
+                }`}
+              >
+                {MARQUEE.repeat(2)}
+              </span>
+            ))}
+          </div>
+        </div>
+
         {/* ════════ HISTORY & ECOLOGY 2×2 GRID ═══════════════════════════ */}
         <section className="py-28 px-6 f-body">
           <div className="max-w-6xl mx-auto">
 
             {/* Section label */}
             <div className="text-center mb-16">
-              <span className={`text-[11px] tracking-[.3em] uppercase font-medium transition-colors duration-700 ${
+              <span className={`f-mono text-[11px] tracking-[.3em] uppercase font-medium transition-colors duration-700 ${
                 isDark ? 'text-amber-400/55' : 'text-emerald-600/70'
-              }`}>Discover</span>
+              }`}>01 — Discover</span>
               <h2 className="f-display text-5xl md:text-[3.75rem] font-light mt-2 transition-colors duration-700">
                 The Living <em>Necklace</em>
               </h2>
@@ -315,8 +402,9 @@ export default function LakeMerrittPage() {
                       : 'bg-white border border-sky-100/90 shadow-sm shadow-sky-100/50'
                   }`}
                 >
-                  {/* Image */}
-                  <div className="h-44 overflow-hidden">
+                  {/* Image — pixel-grid tile reveal on scroll into view */}
+                  <PixelReveal dark={isDark}>
+                  <div className="relative h-44 overflow-hidden">
                     <img
                       src={cardImgs[idx]}
                       alt={card.title}
@@ -325,7 +413,20 @@ export default function LakeMerrittPage() {
                         filter: isDark ? 'brightness(.6) saturate(.75)' : 'brightness(.95)',
                       }}
                     />
+                    {idx === cardImgs.length - 1 && (
+                      <img
+                        src={IMG.nightMoody}
+                        alt=""
+                        aria-hidden="true"
+                        className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700 group-hover:scale-[1.04]"
+                        style={{
+                          filter: 'brightness(.6) saturate(.75)',
+                          opacity: isDark ? 1 : 0,
+                        }}
+                      />
+                    )}
                   </div>
+                  </PixelReveal>
 
                   {/* Body */}
                   <div className="p-6">
@@ -335,7 +436,7 @@ export default function LakeMerrittPage() {
                       </span>
                       <div>
                         <h3 className="f-display text-2xl font-light">{card.title}</h3>
-                        <p className={`text-[10px] tracking-[.22em] uppercase font-medium transition-colors duration-700 ${
+                        <p className={`f-mono text-[10px] tracking-[.22em] uppercase font-medium transition-colors duration-700 ${
                           isDark ? 'text-amber-400/50' : 'text-emerald-600/60'
                         }`}>{card.sub}</p>
                       </div>
@@ -356,9 +457,9 @@ export default function LakeMerrittPage() {
 
             {/* Label */}
             <div className="text-center mb-12">
-              <span className={`text-[11px] tracking-[.3em] uppercase font-medium transition-colors duration-700 ${
+              <span className={`f-mono text-[11px] tracking-[.3em] uppercase font-medium transition-colors duration-700 ${
                 isDark ? 'text-amber-400/55' : 'text-emerald-600/70'
-              }`}>Explore</span>
+              }`}>02 — Explore</span>
               <h2 className="f-display text-5xl md:text-[3.75rem] font-light mt-2 transition-colors duration-700">
                 The 3.4-Mile <em>Loop</em>
               </h2>
@@ -435,7 +536,7 @@ export default function LakeMerrittPage() {
                   style={{ top: pin.top, left: pin.left, transform: 'translate(-50%, -100%)' }}
                 >
                   {/* Floating label */}
-                  <span className={`mb-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap
+                  <span className={`f-mono mb-1 px-2.5 py-1 rounded-lg text-[10px] font-semibold whitespace-nowrap
                     transition-all duration-250 ${
                       activePin === pin.id
                         ? isDark
@@ -465,13 +566,13 @@ export default function LakeMerrittPage() {
               ))}
 
               {/* Map ornaments */}
-              <div className={`absolute bottom-4 right-5 text-[10px] tracking-widest uppercase
+              <div className={`f-mono absolute bottom-4 right-5 text-[10px] tracking-widest uppercase
                 transition-colors duration-700 ${isDark ? 'text-amber-400/22' : 'text-slate-300'}`}>
                 N ↑
               </div>
               <div className="absolute bottom-4 left-5 flex items-center gap-2">
                 <div className={`h-px w-10 transition-colors duration-700 ${isDark ? 'bg-amber-400/20' : 'bg-slate-200'}`} />
-                <span className={`text-[9px] uppercase tracking-wider transition-colors duration-700 ${
+                <span className={`f-mono text-[9px] uppercase tracking-wider transition-colors duration-700 ${
                   isDark ? 'text-amber-400/22' : 'text-slate-300'}`}>
                   0.5 mi
                 </span>
@@ -558,10 +659,10 @@ export default function LakeMerrittPage() {
               </div>
 
               <div className="px-10 py-16 text-center f-body">
-                <span className={`text-[11px] tracking-[.3em] uppercase font-medium mb-4 block transition-colors duration-700 ${
+                <span className={`f-mono text-[11px] tracking-[.3em] uppercase font-medium mb-4 block transition-colors duration-700 ${
                   isDark ? 'text-amber-400/55' : 'text-emerald-600/70'
                 }`}>
-                  {isDark ? 'After Sunset' : "Oakland's Gem"}
+                  03 — The Necklace
                 </span>
 
                 <h2 className={`f-display font-light mb-5 transition-all duration-700 ${
@@ -571,9 +672,7 @@ export default function LakeMerrittPage() {
                     fontSize: 'clamp(2.6rem,6vw,3.8rem)',
                     textShadow: isDark ? '0 0 35px rgba(251,191,36,.35)' : 'none',
                   }}>
-                  {isDark
-                    ? <><em>The Necklace</em> <span className="text-amber-300">of Lights</span></>
-                    : <><em>3,400 Lights</em><br />Around the Lake</>}
+                  <em>3,400 Lights</em><br />Around the Lake
                 </h2>
 
                 <p className={`max-w-2xl mx-auto text-base leading-relaxed font-light transition-colors duration-700 ${
@@ -586,16 +685,6 @@ export default function LakeMerrittPage() {
                     The Living Necklace
                   </em>.
                 </p>
-
-                {/* Night-only image reveal */}
-                {isDark && (
-                  <img
-                    src={IMG.nightMoody}
-                    alt="Moody lakeside at dusk"
-                    className="w-full h-48 object-cover rounded-xl mt-8 fade-up"
-                    style={{ opacity: .55 }}
-                  />
-                )}
               </div>
             </div>
           </div>
@@ -610,24 +699,71 @@ export default function LakeMerrittPage() {
           <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
               <p className="f-display text-2xl font-light">Lake <em>Merritt</em></p>
-              <p className={`text-[10px] tracking-[.25em] uppercase mt-1 transition-colors duration-700 ${
-                isDark ? 'text-amber-400/30' : 'text-slate-400'
+              <p className={`f-mono text-[10px] tracking-[.25em] uppercase mt-1 transition-colors duration-700 ${
+                isDark ? 'text-amber-400/50' : 'text-slate-500'
               }`}>
                 Oakland, California · Est. 1870
               </p>
             </div>
-            <p className={`text-xs text-center md:text-right transition-colors duration-700 ${
-              isDark ? 'text-white/15' : 'text-slate-300'
+            <p className={`f-mono text-xs text-center md:text-right transition-colors duration-700 ${
+              isDark ? 'text-white/40' : 'text-slate-600'
             }`}>
               The United States&apos; First Official Wildlife Refuge
               <br />
-              <span className={isDark ? 'text-amber-400/20' : 'text-slate-200'}>
+              <span className={isDark ? 'text-amber-400/50' : 'text-slate-500'}>
                 The Living Necklace
               </span>
             </p>
           </div>
         </footer>
 
+      </div>
+    </div>
+  );
+}
+
+/* ─── Pixel-grid reveal — 10×5 tiles fade out in random order when the
+       element scrolls into view (dolsten.com-style image reveal) ────────── */
+function PixelReveal({ dark, children }) {
+  const ref = useRef(null);
+  const [shown, setShown] = useState(false);
+  /* Deterministic pseudo-random delays — Math.random() here would render
+     differently on server vs client and trigger hydration mismatches */
+  const delays = useMemo(
+    () => Array.from({ length: 50 }, (_, i) => (i * 137 + 59) % 650),
+    []
+  );
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShown(true);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.25 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="relative">
+      {children}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 grid grid-cols-10 grid-rows-5 pointer-events-none"
+      >
+        {delays.map((d, i) => (
+          <div
+            key={i}
+            className={`transition-opacity duration-500 ${dark ? 'bg-[#0c1829]' : 'bg-white'}`}
+            style={{ opacity: shown ? 0 : 1, transitionDelay: `${d}ms` }}
+          />
+        ))}
       </div>
     </div>
   );

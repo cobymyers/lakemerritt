@@ -1,3 +1,94 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ─── Custom styles (moved out of the component's inline <style> block —
+       React 18 escapes ' and & in SSR'd style text, causing hydration
+       mismatch errors; fonts load via <link> in app/layout.jsx) ─────────── */
+
+/* Font helpers */
+.f-display { font-family: 'Cormorant Garamond', Georgia, serif; }
+.f-body     { font-family: 'DM Sans', system-ui, sans-serif; }
+.f-mono     { font-family: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace; }
+
+/* Blurred word swap (rotating hero word) */
+@keyframes blur-in {
+  from { opacity:0; filter:blur(10px); transform:translateY(12px); }
+  to   { opacity:1; filter:blur(0);    transform:translateY(0); }
+}
+.blur-in { animation: blur-in .8s cubic-bezier(.22,1,.36,1) both; }
+
+/* Marquee strip — track holds two identical copies for a seamless loop */
+@keyframes marquee {
+  from { transform:translateX(0); }
+  to   { transform:translateX(-50%); }
+}
+.marquee-track { animation: marquee 30s linear infinite; }
+
+/* Water shimmer */
+@keyframes shimmer {
+  0%,100% { background-position: 0% 50%; }
+  50%      { background-position: 100% 50%; }
+}
+.water-day {
+  background: linear-gradient(135deg,#38bdf8,#0ea5e9,#06b6d4,#22d3ee,#38bdf8);
+  background-size: 300% 300%;
+  animation: shimmer 8s ease infinite;
+}
+.water-night {
+  background: linear-gradient(135deg,#0b1e3d,#0f2a50,#142f60,#0b1e3d);
+  background-size: 300% 300%;
+  animation: shimmer 10s ease infinite;
+}
+
+/* Necklace glow – applied to containers in dark mode */
+.necklace {
+  box-shadow:
+    0 0 0 1px rgba(251,191,36,.45),
+    0 0 20px 4px rgba(251,191,36,.10),
+    0 0 60px 8px rgba(251,191,36,.04),
+    inset 0 0 28px 2px rgba(251,191,36,.03);
+}
+
+/* Floating caret */
+@keyframes float {
+  0%,100% { transform:translateY(0); }
+  50%      { transform:translateY(-9px); }
+}
+.float { animation: float 3.8s ease-in-out infinite; }
+
+/* Amber dot pulse */
+@keyframes amber-pulse {
+  0%,100% { opacity:.75; }
+  50%      { opacity:1; filter:drop-shadow(0 0 5px rgba(251,191,36,.9)); }
+}
+.a-pulse { animation: amber-pulse 2s ease-in-out infinite; }
+
+/* Fact panel fade-up */
+@keyframes fade-up {
+  from { opacity:0; transform:translateY(12px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.fade-up { animation: fade-up .35s ease forwards; }
+
+/* Card lift */
+.card-lift { transition: transform .35s cubic-bezier(.34,1.56,.64,1), box-shadow .35s ease; }
+.card-lift:hover { transform: translateY(-7px); }
+
+/* Pin hover */
+.pin-icon { transition: transform .2s ease; }
+button:hover .pin-icon { transform: scale(1.2) translateY(-3px); }
+
+/* Stripe texture on water */
+.water-stripes {
+  background-image: repeating-linear-gradient(
+    0deg, transparent, transparent 11px,
+    rgba(255,255,255,.18) 11px, rgba(255,255,255,.18) 12px
+  );
+}
+
+/* Slow rotation — hero shoreline rings (organic border-radius makes
+   rotation read as a drifting shoreline rather than a spinning circle) */
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
