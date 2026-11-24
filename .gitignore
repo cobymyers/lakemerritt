@@ -19,3 +19,17 @@ dist/
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Local only: leftover Simplefolio template files (pre-Next.js)
+/.nvmrc
+/.prettierrc
+/LICENSE.md
+/README.md
+/examples/
+/src/assets/
+/src/data/
+/src/index.html
+/src/index.js
+/src/sass/
+/src/scripts/
+/src/styles.scss
